@@ -2,6 +2,7 @@
 
 #include <QJsonObject>
 #include <QString>
+#include <QStringList>
 
 class OllamaClient
 {
@@ -22,6 +23,7 @@ public:
     };
 
     explicit OllamaClient(const QString &endpoint, const QString &apiKey = {});
+    QStringList listModels(QString *error = nullptr);
     QJsonObject modelInfo(const QString &model, QString *error);
     Generation generate(const QString &model, const QString &prompt,
                         const QString &systemPrompt, const QJsonObject &options);

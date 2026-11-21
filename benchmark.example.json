@@ -5,7 +5,7 @@
   "repetitions": 1,
   "systemPrompt": "Return a Common Lisp implementation for the requested function.",
   "models": [
-    "qwen2.5-coder:7b"
+    "gemma3:4b"
   ],
   "options": {
     "temperature": 0.2,
@@ -13,19 +13,134 @@
   },
   "tasks": [
     {
-      "id": "count-occurrences",
-      "prompt": "Implement COUNT-OCCURRENCES for Common Lisp. It takes an item and a list and returns the number of EQL matches. Return the code in a Lisp code block.",
-      "function": "COUNT-OCCURRENCES",
+      "id": "factorial",
+      "prompt": "Напиши функцию FACTORIAL на Common Lisp, которая вычисляет факториал неотрицательного целого числа. Верни только код функции.",
+      "function": "FACTORIAL",
       "tests": [
         {
-          "name": "duplicates",
-          "arguments": "2 '(2 3 2)",
-          "expected": "2"
+          "name": "zero",
+          "arguments": "0",
+          "expected": "1"
         },
         {
-          "name": "empty-list",
-          "arguments": "'a nil",
+          "name": "small",
+          "arguments": "5",
+          "expected": "120"
+        },
+        {
+          "name": "medium",
+          "arguments": "10",
+          "expected": "3628800"
+        }
+      ]
+    },
+    {
+      "id": "flatten-list",
+      "prompt": "Напиши функцию FLATTEN на Common Lisp, которая принимает вложенный список любой глубины и возвращает плоский список всех элементов. Верни только код функции.",
+      "function": "FLATTEN",
+      "tests": [
+        {
+          "name": "already-flat",
+          "arguments": "'(1 2 3)",
+          "expected": "'(1 2 3)"
+        },
+        {
+          "name": "nested",
+          "arguments": "'(1 (2 (3 4) 5) 6)",
+          "expected": "'(1 2 3 4 5 6)"
+        },
+        {
+          "name": "empty",
+          "arguments": "'()",
+          "expected": "'()"
+        }
+      ]
+    },
+    {
+      "id": "palindrome-check",
+      "prompt": "Напиши функцию PALINDROME-P на Common Lisp, которая проверяет, является ли строка палиндромом (читается одинаково слева направо и справа налево). Верни только код функции.",
+      "function": "PALINDROME-P",
+      "tests": [
+        {
+          "name": "odd-length",
+          "arguments": "\"racecar\"",
+          "expected": "T"
+        },
+        {
+          "name": "even-length",
+          "arguments": "\"abba\"",
+          "expected": "T"
+        },
+        {
+          "name": "not-palindrome",
+          "arguments": "\"hello\"",
+          "expected": "NIL"
+        }
+      ]
+    },
+    {
+      "id": "fibonacci",
+      "prompt": "Напиши функцию FIBONACCI на Common Lisp, которая возвращает n-е число Фибоначчи (где F(0)=0, F(1)=1). Верни только код функции.",
+      "function": "FIBONACCI",
+      "tests": [
+        {
+          "name": "zero",
+          "arguments": "0",
           "expected": "0"
+        },
+        {
+          "name": "one",
+          "arguments": "1",
+          "expected": "1"
+        },
+        {
+          "name": "ten",
+          "arguments": "10",
+          "expected": "55"
+        }
+      ]
+    },
+    {
+      "id": "dot-product",
+      "prompt": "Напиши функцию DOT-PRODUCT на Common Lisp, которая принимает два списка чисел одинаковой длины и возвращает их скалярное произведение. Верни только код функции.",
+      "function": "DOT-PRODUCT",
+      "tests": [
+        {
+          "name": "basic",
+          "arguments": "'(1 2 3) '(4 5 6)",
+          "expected": "32"
+        },
+        {
+          "name": "zeros",
+          "arguments": "'(0 0) '(10 20)",
+          "expected": "0"
+        },
+        {
+          "name": "negatives",
+          "arguments": "'(-1 2) '(3 -4)",
+          "expected": "-11"
+        }
+      ]
+    },
+    {
+      "id": "remove-duplicates-custom",
+      "prompt": "Напиши функцию MY-REMOVE-DUPLICATES на Common Lisp, которая удаляет дубликаты элементов из списка, сохраняя порядок первого вхождения каждого элемента. Не используй встроенную функцию REMOVE-DUPLICATES. Верни только код функции.",
+      "function": "MY-REMOVE-DUPLICATES",
+      "tests": [
+        {
+          "name": "with-dups",
+          "arguments": "'(1 2 2 3 1 4)",
+          "expected": "'(1 2 3 4)"
+        },
+        {
+          "name": "no-dups",
+          "arguments": "'(a b c)",
+          "expected": "'(A B C)"
+        },
+        {
+          "name": "all-same",
+          "arguments": "'(7 7 7 7)",
+          "expected": "'(7)"
         }
       ]
     }

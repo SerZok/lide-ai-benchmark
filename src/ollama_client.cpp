@@ -82,6 +82,23 @@ QString OllamaClient::apiUrl(const QString &path) const
     return m_endpoint + QStringLiteral("/api/") + path;
 }
 
+QStringList OllamaClient::listModels(QString *error)
+{
+    QStringList result;
+    if (error)
+        error->clear();
+    const QJsonObject response = requestJson(apiUrl(QStringLiteral("tags")),
+                                             QByteArrayLiteral("GET"), {}, m_apiKey,
+                                             error, 15000);
+    for (const QJsonValue &value : response.value("models").toArray())
+    {
+        const QString name = value.toObject().value("name").toString();
+        if (!name.isEmpty())
+            result.append(name);
+    }
+    return result;
+}
+
 QJsonObject OllamaClient::modelInfo(const QString &model, QString *error)
 {
     if (error)
