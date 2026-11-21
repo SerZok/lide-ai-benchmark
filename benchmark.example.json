@@ -1,0 +1,33 @@
+{
+  "endpoint": "http://127.0.0.1:11434",
+  "sbclPath": "../libs/SBCL/sbcl.exe",
+  "output": "results.jsonl",
+  "repetitions": 1,
+  "systemPrompt": "Return a Common Lisp implementation for the requested function.",
+  "models": [
+    "qwen2.5-coder:7b"
+  ],
+  "options": {
+    "temperature": 0.2,
+    "num_predict": 512
+  },
+  "tasks": [
+    {
+      "id": "count-occurrences",
+      "prompt": "Implement COUNT-OCCURRENCES for Common Lisp. It takes an item and a list and returns the number of EQL matches. Return the code in a Lisp code block.",
+      "function": "COUNT-OCCURRENCES",
+      "tests": [
+        {
+          "name": "duplicates",
+          "arguments": "2 '(2 3 2)",
+          "expected": "2"
+        },
+        {
+          "name": "empty-list",
+          "arguments": "'a nil",
+          "expected": "0"
+        }
+      ]
+    }
+  ]
+}
