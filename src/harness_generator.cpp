@@ -5,14 +5,14 @@
 
 namespace
 {
-QString escapeLispString(QString value)
-{
-    value.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
-    value.replace(QLatin1Char('"'), QStringLiteral("\\\""));
-    value.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
-    value.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
-    return value;
-}
+    QString escapeLispString(QString value)
+    {
+        value.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+        value.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+        value.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
+        value.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
+        return value;
+    }
 }
 
 QString HarnessGenerator::generate(const QJsonObject &task, const QString &sourcePath,
@@ -54,22 +54,22 @@ QString HarnessGenerator::generate(const QString &sourcePath, const QString &fun
                                    const QVector<SbclSandbox::TestCase> &tests)
 {
     QString harness = QStringLiteral(
-        "(cl:setf cl:*read-eval* cl:nil)\n"
-        "(cl:let ((passed 0) (total %1))\n"
-        "  (cl:labels ((check (name expected thunk)\n"
-        "               (cl:handler-case\n"
-        "                   (cl:let ((actual (cl:funcall thunk)))\n"
-        "                     (cl:if (cl:equal expected actual)\n"
-        "                            (cl:progn (cl:incf passed) "
-        "(cl:format cl:*standard-output* \"LIDE_TEST_PASS:~A~%\" name))\n"
-        "                            (cl:format cl:*standard-output* "
-        "\"LIDE_TEST_FAIL:~A expected=~S actual=~S~%\" name expected actual)))\n"
-        "                 (cl:error (condition)\n"
-        "                   (cl:format cl:*standard-output* \"LIDE_TEST_ERROR:~A ~A~%\" "
-        "name condition)))))\n"
-        "    (cl:handler-case\n"
-        "        (cl:let ((cl:*package* (cl:find-package \"CL-USER\")))\n"
-        "          (cl:load \"%2\" :verbose cl:nil :print cl:nil)\n")
+                          "(cl:setf cl:*read-eval* cl:nil)\n"
+                          "(cl:let ((passed 0) (total %1))\n"
+                          "  (cl:labels ((check (name expected thunk)\n"
+                          "               (cl:handler-case\n"
+                          "                   (cl:let ((actual (cl:funcall thunk)))\n"
+                          "                     (cl:if (cl:equal expected actual)\n"
+                          "                            (cl:progn (cl:incf passed) "
+                          "(cl:format cl:*standard-output* \"TEST_PASS:~A~%\" name))\n"
+                          "                            (cl:format cl:*standard-output* "
+                          "\"TEST_FAIL:~A expected=~S actual=~S~%\" name expected actual)))\n"
+                          "                 (cl:error (condition)\n"
+                          "                   (cl:format cl:*standard-output* \"TEST_ERROR:~A ~A~%\" "
+                          "name condition)))))\n"
+                          "    (cl:handler-case\n"
+                          "        (cl:let ((cl:*package* (cl:find-package \"CL-USER\")))\n"
+                          "          (cl:load \"%2\" :verbose cl:nil :print cl:nil)\n")
                           .arg(tests.size())
                           .arg(escapeLispString(sourcePath));
 
@@ -84,11 +84,11 @@ QString HarnessGenerator::generate(const QString &sourcePath, const QString &fun
     }
 
     harness += QStringLiteral(
-        "          (cl:format cl:*standard-output* \"LIDE_RESULT:~D/~D~%\" passed total)\n"
+        "          (cl:format cl:*standard-output* \"RESULT:~D/~D~%\" passed total)\n"
         "          (sb-ext:exit :code (cl:if (cl:= passed total) 0 1)))\n"
         "      (cl:error (condition)\n"
-        "        (cl:format cl:*standard-output* \"LIDE_HARNESS_ERROR:~A~%\" condition)\n"
-        "        (cl:format cl:*standard-output* \"LIDE_RESULT:~D/~D~%\" passed total)\n"
+        "        (cl:format cl:*standard-output* \"HARNESS_ERROR:~A~%\" condition)\n"
+        "        (cl:format cl:*standard-output* \"RESULT:~D/~D~%\" passed total)\n"
         "        (sb-ext:exit :code 2)))))\n");
     return harness;
 }

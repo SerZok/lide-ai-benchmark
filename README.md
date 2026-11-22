@@ -16,11 +16,6 @@ cmake -S benchmark -B benchmark/build -DCMAKE_PREFIX_PATH="C:\Qt\6.10.2\msvc2022
 cmake --build benchmark/build --config Release
 ```
 
-The root LIDE CMake project also builds `lide-ai-benchmark` as a separate
-executable beside LIDE. Its **Опции → Исследовательский бенчмарк моделей...**
-menu item launches the benchmark GUI and passes the configured endpoint, model,
-SBCL path, and API key from LIDE's settings.
-
 ## Configure and run
 
 Copy `benchmark.example.json` and edit the model, task prompts, Lisp function
@@ -64,8 +59,6 @@ categories and are not silently included in CER or RVR.
 
 ---
 
-# lide-ai-benchmark
-
 Стандартизированное Qt-приложение для оценки генерации кода на Common Lisp.
 CLI-интерфейс обращается к Ollama-совместимому эндпоинту `/api/chat`, извлекает
 Lisp-код, запускает тесты задач в изолированном SBCL-песочнице (Windows
@@ -83,16 +76,11 @@ cmake -S benchmark -B benchmark/build -DCMAKE_PREFIX_PATH="C:\Qt\6.10.2\msvc2022
 cmake --build benchmark/build --config Release
 ```
 
-Корневой CMake-проект LIDE также собирает `lide-ai-benchmark` как отдельный
-исполняемый файл рядом с LIDE. Пункт меню **Опции → Исследовательский бенчмарк
-моделей...** запускает GUI бенчмарка и передаёт настроенные эндпоинт, модель,
-путь к SBCL и API-ключ из настроек LIDE.
-
 ## Настройка и запуск
 
 Скопируйте `benchmark.example.json` и отредактируйте: модель, промпты задач,
 имена Lisp-функций, ожидаемые выражения и путь к исполняемому файлу SBCL.
-Поля `arguments` и `expected` в тестах — это выражения Common Lisp, закодированные
+Поля `arguments` и `expected` в тестах - это выражения Common Lisp, закодированные
 как JSON-строки. Пути в конфигурации указываются относительно файла конфигурации.
 
 ```powershell
@@ -114,7 +102,7 @@ JSONL-записи включают задержку генерации, TTFT (�
 ответ, извлечённый код, результаты песочницы и категорию ошибки. Метрики
 `pass@1`, CER и RVR рассчитываются только по первой попытке для каждой задачи;
 распределение категорий ошибок включает все повторы. CER считает ошибки чтения/загрузки
-SBCL, RVR — таймауты, превышение лимита памяти и лимита вывода. Ошибки инфраструктуры
+SBCL, RVR - таймауты, превышение лимита памяти и лимита вывода. Ошибки инфраструктуры
 и генерации хранятся в отдельных категориях и не входят в CER и RVR.
 
 ## Метрики CER и RVR
@@ -122,9 +110,9 @@ SBCL, RVR — таймауты, превышение лимита памяти �
 `pass@1`, CER и RVR рассчитываются только по первой попытке (attempt 1) для каждой
 пары модель-задача.
 
-- **CER** (Compilation/Read Error Rate) — доля задач с ошибками компиляции или чтения
+- **CER** (Compilation/Read Error Rate) - доля задач с ошибками компиляции или чтения
   (SBCL не смог загрузить сгенерированный код).
-- **RVR** (Resource Violation Rate) — доля задач, завершившихся из-за исчерпания
+- **RVR** (Resource Violation Rate) - доля задач, завершившихся из-за исчерпания
   ресурсов: таймаут, превышение лимита памяти или объёма вывода.
 
 Ошибки генерации и извлечения кода (generation_error, extraction_error) не входят

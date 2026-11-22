@@ -28,7 +28,6 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
     void refreshModels();
@@ -49,12 +48,11 @@ private:
     void appendProcessOutput();
     void finishProcess(int exitCode, QProcess::ExitStatus exitStatus);
     void setRunning(bool running);
-    void updateModelsDisplayText();
+    void autoAggregateResults();
 
     QLineEdit *m_configPath;
     QLineEdit *m_endpoint;
     QComboBox *m_models;
-    QStandardItemModel *m_modelsModel = nullptr;
     QPushButton *m_refreshModels;
     QSpinBox *m_repetitions;
     QLineEdit *m_sbclPath;
@@ -66,7 +64,6 @@ private:
     QLabel *m_summary;
     QPushButton *m_runButton;
     QPushButton *m_cancelButton;
-    QPushButton *m_aggregateButton;
     QPushButton *m_loadResultsButton;
     QProcess *m_process = nullptr;
     QTemporaryDir m_temporaryDirectory;

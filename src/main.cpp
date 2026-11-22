@@ -103,6 +103,8 @@ namespace
             return QStringLiteral("incorrect_result");
         if (status == QStringLiteral("no-code"))
             return QStringLiteral("extraction_error");
+        if (status == QStringLiteral("failed") && sandboxOutput.contains(QStringLiteral("did not complete")))
+            return QStringLiteral("resource_violation");
         return QStringLiteral("infrastructure_error");
     }
 

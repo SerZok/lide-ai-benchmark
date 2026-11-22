@@ -35,12 +35,19 @@
 #include <QColor>
 #include <QStringList>
 #include <QComboBox>
-#include <QStandardItemModel>
 #include <QListView>
-#include <QMouseEvent>
+#include <QGroupBox>
 
 namespace
 {
+    QString sanitizeModelName(const QString &model)
+    {
+        QString name = model;
+        name.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")), QStringLiteral("_"));
+        name.replace(QRegularExpression(QStringLiteral("_{2,}")), QStringLiteral("_"));
+        return name.isEmpty() ? QStringLiteral("model") : name.left(60);
+    }
+
     QString resultStatusText(const QString &status)
     {
         if (status == QStringLiteral("passed"))
@@ -83,7 +90,6 @@ BenchmarkWindow::BenchmarkWindow(QWidget *parent)
       m_configPath(new QLineEdit(this)),
       m_endpoint(new QLineEdit(this)),
       m_models(new QComboBox(this)),
-      m_modelsModel(new QStandardItemModel(m_models)),
       m_repetitions(new QSpinBox(this)),
       m_sbclPath(new QLineEdit(this)),
       m_apiKey(new QLineEdit(this)),
@@ -94,17 +100,13 @@ BenchmarkWindow::BenchmarkWindow(QWidget *parent)
       m_summary(new QLabel(this)),
       m_runButton(new QPushButton(tr("Запустить"), this)),
       m_cancelButton(new QPushButton(tr("Остановить"), this)),
-      m_aggregateButton(new QPushButton(tr("Экспорт CSV/Markdown..."), this)),
       m_loadResultsButton(new QPushButton(tr("Открыть JSONL..."), this)),
       m_refreshModels(nullptr)
 {
-    m_models->setModel(m_modelsModel);
     m_models->setEditable(true);
-    m_models->setCompleter(nullptr);
     m_models->setPlaceholderText(tr("Нажмите для выбора моделей"));
-    m_models->view()->viewport()->installEventFilter(this);
     m_refreshModels = new QPushButton(tr("Обновить"), this);
-    setWindowTitle(tr("LIDE — бенчмарк моделей"));
+    setWindowTitle(tr("Бенчмарк моделей для Common Lisp"));
     resize(900, 680);
     m_repetitions->setRange(1, 10000);
     m_repetitions->setValue(1);
@@ -177,7 +179,6 @@ BenchmarkWindow::BenchmarkWindow(QWidget *parent)
     buttons->addWidget(m_runButton);
     buttons->addWidget(m_cancelButton);
     buttons->addWidget(m_loadResultsButton);
-    buttons->addWidget(m_aggregateButton);
     buttons->addStretch();
 
     auto *central = new QWidget(this);
@@ -192,8 +193,18 @@ BenchmarkWindow::BenchmarkWindow(QWidget *parent)
     resultsSplitter->setStretchFactor(1, 2);
     resultsSplitter->setChildrenCollapsible(false);
     layout->addWidget(resultsSplitter, 1);
-    m_output->setMaximumHeight(100);
-    layout->addWidget(m_output);
+
+    auto *mainSplitter = new QSplitter(Qt::Vertical, central);
+    mainSplitter->addWidget(resultsSplitter);
+
+    auto *outputGroup = new QGroupBox(tr("Лог выполнения"), mainSplitter);
+    auto *outputResultLayout = new QVBoxLayout(outputGroup);
+    outputResultLayout->addWidget(m_output);
+
+    mainSplitter->setStretchFactor(0, 3);
+    mainSplitter->setStretchFactor(1, 1);
+    layout->addWidget(mainSplitter, 1);
+
     setCentralWidget(central);
 
     connect(configBrowse, &QPushButton::clicked, this, &BenchmarkWindow::browseConfig);
@@ -202,7 +213,6 @@ BenchmarkWindow::BenchmarkWindow(QWidget *parent)
     connect(m_refreshModels, &QPushButton::clicked, this, &BenchmarkWindow::refreshModels);
     connect(m_runButton, &QPushButton::clicked, this, &BenchmarkWindow::startBenchmark);
     connect(m_cancelButton, &QPushButton::clicked, this, &BenchmarkWindow::cancelProcess);
-    connect(m_aggregateButton, &QPushButton::clicked, this, &BenchmarkWindow::aggregateResults);
     connect(m_loadResultsButton, &QPushButton::clicked, this, &BenchmarkWindow::loadResults);
     connect(m_results, &QTableWidget::cellClicked, this, &BenchmarkWindow::showSelectedResult);
     connect(&m_resultsTimer, &QTimer::timeout, this, &BenchmarkWindow::pollResults);
@@ -244,7 +254,6 @@ void BenchmarkWindow::refreshModels()
         return;
     }
     m_refreshModels->setEnabled(false);
-    m_modelsModel->clear();
     m_output->appendPlainText(tr("Запрос списка моделей из %1...").arg(endpoint));
 
     const QString apiKey = m_apiKey->text();
@@ -261,14 +270,12 @@ void BenchmarkWindow::refreshModels()
     }
     else
     {
-        for (const QString &name : models)
+        m_models->clear();
+        m_models->addItems(models);
+        if (!models.isEmpty())
         {
-            auto *item = new QStandardItem(name);
-            item->setCheckable(true);
-            item->setCheckState(Qt::Unchecked);
-            m_modelsModel->appendRow(item);
+            m_models->setCurrentIndex(0);
         }
-        updateModelsDisplayText();
         m_output->appendPlainText(tr("Загружено %1 модель(ей).").arg(models.size()));
     }
     m_refreshModels->setEnabled(true);
@@ -304,14 +311,19 @@ void BenchmarkWindow::loadConfig(const QString &path)
     const QJsonObject config = document.object();
     m_configPath->setText(QFileInfo(path).absoluteFilePath());
     m_endpoint->setText(config.value("endpoint").toString(QStringLiteral("http://127.0.0.1:11434")));
+
+    m_models->clear();
+    QStringList configModels;
     for (const QJsonValue &model : config.value("models").toArray())
     {
-        auto *item = new QStandardItem(model.toString());
-        item->setCheckable(true);
-        item->setCheckState(Qt::Checked);
-        m_modelsModel->appendRow(item);
+        configModels.append(model.toString().trimmed());
     }
-    updateModelsDisplayText();
+    m_models->addItems(configModels);
+
+    if (!configModels.isEmpty())
+    {
+        m_models->setCurrentIndex(0);
+    }
     m_repetitions->setValue(qBound(1, config.value("repetitions").toInt(1), 10000));
 
     QString sbcl = config.value("sbclPath").toString();
@@ -378,25 +390,27 @@ void BenchmarkWindow::startBenchmark()
         return;
     }
 
-    QStringList models;
-    for (int i = 0; i < m_modelsModel->rowCount(); ++i)
+    QString model = m_models->currentText().trimmed();
+    if (model.isEmpty())
     {
-        auto *item = m_modelsModel->item(i);
-        if (item && item->checkState() == Qt::Checked)
-            models.append(item->text().trimmed());
-    }
-    if (models.isEmpty())
-    {
-        QMessageBox::warning(this, tr("Не выбрана модель"), tr("Укажите хотя бы одну модель."));
+        QMessageBox::warning(this, tr("Не выбрана модель"), tr("Укажите модель для тестирования."));
         return;
     }
+    QString safeModelName = sanitizeModelName(model);
+    QString currentOutput = m_outputPath->text().trimmed();
+    QFileInfo outInfo(currentOutput);
+    QString extension = outInfo.suffix().isEmpty() ? QStringLiteral("jsonl") : outInfo.suffix();
+    QString newFileName = QStringLiteral("%1_%2.%3").arg(outInfo.completeBaseName(), safeModelName, extension);
+    QString newOutputPath = outInfo.absoluteDir().filePath(newFileName);
+
+    m_outputPath->setText(newOutputPath);
 
     QJsonObject config = document.object();
     config.insert("endpoint", m_endpoint->text().trimmed());
-    config.insert("models", QJsonArray::fromStringList(models));
+    config.insert("models", QJsonArray::fromStringList({model}));
     config.insert("repetitions", m_repetitions->value());
     config.insert("sbclPath", QFileInfo(m_sbclPath->text()).absoluteFilePath());
-    config.insert("output", QFileInfo(m_outputPath->text()).absoluteFilePath());
+    config.insert("output", newOutputPath);
 
     const QJsonArray tasks = config.value("tasks").toArray();
     if (tasks.isEmpty())
@@ -434,8 +448,8 @@ void BenchmarkWindow::startBenchmark()
     m_jsonlPosition = 0;
     m_pendingJsonl.clear();
     updateSummary();
-    m_output->appendPlainText(tr("Запуск %1 моделей, %2 задач, %3 повторов.")
-                                  .arg(models.size())
+    m_output->appendPlainText(tr("Запуск %1, %2 задач, %3 повторов.")
+                                  .arg(m_models->currentText().trimmed())
                                   .arg(tasks.size())
                                   .arg(m_repetitions->value()));
     m_process = new QProcess(this);
@@ -635,16 +649,21 @@ void BenchmarkWindow::updateSummary()
         resourceViolations += category == QStringLiteral("resource_violation") ? 1 : 0;
     }
     const int count = firstAttemptTasks.size();
-    m_summary->setText(
-        tr("Записей: %1  ·  pass@1: %2/%3 (%4%)  ·  CER: %5%  ·  RVR: %6%")
-            .arg(m_records.size())
-            .arg(passed)
-            .arg(count)
-            .arg(count ? QString::number(passed * 100.0 / count, 'f', 1) : QStringLiteral("0.0"))
-            .arg(count ? QString::number(compileErrors * 100.0 / count, 'f', 1)
-                       : QStringLiteral("0.0"))
-            .arg(count ? QString::number(resourceViolations * 100.0 / count, 'f', 1)
-                       : QStringLiteral("0.0")));
+    const QString summaryText = tr("Записей: %1  ·  pass@1: %2/%3 (%4%)  ·  CER: %5%  ·  RVR: %6%")
+                                    .arg(m_records.size())
+                                    .arg(passed)
+                                    .arg(count)
+                                    .arg(count ? QString::number(passed * 100.0 / count, 'f', 1) : QStringLiteral("0.0"))
+                                    .arg(count ? QString::number(compileErrors * 100.0 / count, 'f', 1) : QStringLiteral("0.0"))
+                                    .arg(count ? QString::number(resourceViolations * 100.0 / count, 'f', 1) : QStringLiteral("0.0"));
+
+    m_summary->setText(summaryText);
+
+    m_summary->setToolTip(tr(
+        "<b>pass@1</b>: Доля задач, успешно решенных с первой попытки (все тесты пройдены).<br>"
+        "<b>CER</b> (Compilation Error Rate): Доля задач, завершившихся ошибкой компиляции или чтения кода.<br>"
+        "<b>RVR</b> (Resource Violation Rate): Доля задач, прерванных из-за нехватки ресурсов (таймаут, лимит памяти или вывода).<br>"));
+    m_summary->setCursor(Qt::WhatsThisCursor);
 }
 
 void BenchmarkWindow::aggregateResults()
@@ -717,9 +736,20 @@ void BenchmarkWindow::finishProcess(int exitCode, QProcess::ExitStatus exitStatu
 {
     appendProcessOutput();
     const bool success = exitStatus == QProcess::NormalExit && exitCode == 0;
+
+    // Проверяем, был ли это запуск бенчмарка (по наличию флага --config в аргументах)
+    const bool wasBenchmarkRun = m_process && m_process->arguments().contains(QStringLiteral("--config"));
+
     m_output->appendPlainText(success
-                                  ? tr("Процесс завершился успешно.")
-                                  : tr("Процесс завершился с ошибкой (код %1).").arg(exitCode));
+                                  ? tr("✅ Процесс завершился успешно.")
+                                  : tr("❌ Процесс завершился с ошибкой (код %1).").arg(exitCode));
+
+    // Если бенчмарк прошел успешно, запускаем авто-агрегацию
+    if (success && wasBenchmarkRun)
+    {
+        autoAggregateResults();
+    }
+
     setRunning(false);
     m_process->deleteLater();
     m_process = nullptr;
@@ -728,7 +758,6 @@ void BenchmarkWindow::finishProcess(int exitCode, QProcess::ExitStatus exitStatu
 void BenchmarkWindow::setRunning(bool running)
 {
     m_runButton->setEnabled(!running);
-    m_aggregateButton->setEnabled(!running);
     m_cancelButton->setEnabled(running);
     m_configPath->setEnabled(!running);
 }
@@ -752,53 +781,42 @@ void BenchmarkWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
-bool BenchmarkWindow::eventFilter(QObject *obj, QEvent *event)
+void BenchmarkWindow::autoAggregateResults()
 {
-    // Перехватываем отпускание кнопки мыши на выпадающем списке
-    if (obj == m_models->view()->viewport() && event->type() == QEvent::MouseButtonRelease)
-    {
-        auto *mouseEvent = static_cast<QMouseEvent *>(event);
-        QListView *view = qobject_cast<QListView *>(m_models->view());
-        QModelIndex index = view->indexAt(mouseEvent->pos());
+    const QString jsonlPath = m_outputPath->text().trimmed();
+    if (jsonlPath.isEmpty())
+        return;
 
-        if (index.isValid())
-        {
-            QStandardItem *item = m_modelsModel->itemFromIndex(index);
-            if (item && item->isCheckable())
+    const QString scriptPath = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("aggregator.py"));
+    if (!QFileInfo::exists(scriptPath))
+    {
+        m_output->appendPlainText(tr("⚠ Агрегатор (aggregator.py) не найден рядом с приложением. Авто-экспорт пропущен."));
+        return;
+    }
+
+    m_output->appendPlainText(tr("🔄 Авто-агрегация результатов в %1...").arg(jsonlPath));
+
+    QProcess *aggProcess = new QProcess(this);
+#ifdef Q_OS_WIN
+    aggProcess->setProgram(QStringLiteral("python"));
+#else
+    aggProcess->setProgram(QStringLiteral("python3"));
+#endif
+    aggProcess->setArguments({scriptPath, jsonlPath});
+
+    connect(aggProcess, &QProcess::readyReadStandardOutput, this, [this, aggProcess]()
+            { m_output->appendPlainText(QString::fromLocal8Bit(aggProcess->readAllStandardOutput())); });
+    connect(aggProcess, &QProcess::readyReadStandardError, this, [this, aggProcess]()
+            { m_output->appendPlainText(QString::fromLocal8Bit(aggProcess->readAllStandardError())); });
+    connect(aggProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, aggProcess](int exitCode, QProcess::ExitStatus exitStatus)
             {
-                Qt::CheckState currentState = item->checkState();
-                item->setCheckState(currentState == Qt::Checked ? Qt::Unchecked : Qt::Checked);
-
-                updateModelsDisplayText();
-
-                return true;
-            }
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            m_output->appendPlainText(tr("✅ Авто-агрегация успешно завершена. CSV/Markdown созданы рядом с JSONL."));
+        } else {
+            m_output->appendPlainText(tr("❌ Ошибка авто-агрегации (код %1).").arg(exitCode));
         }
-    }
-    return QMainWindow::eventFilter(obj, event);
-}
+        aggProcess->deleteLater(); });
 
-void BenchmarkWindow::updateModelsDisplayText()
-{
-    QStringList checkedModels;
-    for (int i = 0; i < m_modelsModel->rowCount(); ++i)
-    {
-        if (m_modelsModel->item(i)->checkState() == Qt::Checked)
-        {
-            checkedModels.append(m_modelsModel->item(i)->text());
-        }
-    }
-
-    if (checkedModels.isEmpty())
-    {
-        m_models->setEditText(tr("Выберите модели..."));
-    }
-    else if (checkedModels.size() == 1)
-    {
-        m_models->setEditText(checkedModels.first());
-    }
-    else
-    {
-        m_models->setEditText(checkedModels.join(","));
-    }
+    aggProcess->start();
 }
